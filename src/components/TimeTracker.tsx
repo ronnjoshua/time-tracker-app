@@ -27,29 +27,13 @@ type ViewMode = "list" | "projects" | "daily" | "weekly" | "monthly" | "dashboar
 
 export default function TimeTracker() {
   const {
-    completedEntries,
-    activeEntry,
-    loading,
-    fetchEntries,
-    createEntry,
-    createManualEntry,
-    duplicateEntry,
-    stopEntry,
-    updateEntry,
-    deleteEntry,
+    completedEntries, activeEntry, loading,
+    fetchEntries, createEntry, createManualEntry, duplicateEntry,
+    stopEntry, updateEntry, deleteEntry,
   } = useEntries();
 
-  const {
-    projects,
-    fetchProjects,
-    createProject,
-    updateProject,
-    deleteProject,
-  } = useProjects();
-
-  const { tags, fetchTags, createTag, deleteTag, getEntryTags, setEntryTags } =
-    useTags();
-
+  const { projects, fetchProjects, createProject, updateProject, deleteProject } = useProjects();
+  const { tags, fetchTags, createTag, deleteTag, getEntryTags, setEntryTags } = useTags();
   const elapsed = useTimer(activeEntry);
 
   const [taskName, setTaskName] = useState("");
@@ -61,6 +45,7 @@ export default function TimeTracker() {
   const [showTagManager, setShowTagManager] = useState(false);
   const [showInvoice, setShowInvoice] = useState(false);
   const [showManualEntry, setShowManualEntry] = useState(false);
+  const [showActionsMenu, setShowActionsMenu] = useState(false);
   const [editingEntry, setEditingEntry] = useState<{
     entry: import("@/lib/types").TimeEntry;
     tagIds: string[];
@@ -70,8 +55,20 @@ export default function TimeTracker() {
   const [dateTo, setDateTo] = useState<string | undefined>();
 
   const taskInputRef = useRef<HTMLInputElement>(null);
+  const actionsRef = useRef<HTMLDivElement>(null);
 
-  // Load last used project from localStorage
+  // Close actions menu on outside click
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (actionsRef.current && !actionsRef.current.contains(e.target as Node)) {
+        setShowActionsMenu(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  // Load last used project
   useEffect(() => {
     const lastProject = localStorage.getItem("lastProjectId");
     if (lastProject) setSelectedProjectId(lastProject);
@@ -102,34 +99,23 @@ export default function TimeTracker() {
   // Keyboard shortcuts
   useEffect(() => {
     const handleKeydown = (e: KeyboardEvent) => {
-      // Don't trigger in inputs/textareas/selects
       const tag = (e.target as HTMLElement).tagName;
       if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
-
       if (e.key === "s" || e.key === "S") {
         e.preventDefault();
-        if (activeEntry) {
-          handleStop();
-        } else if (taskName.trim()) {
-          handleStart();
-        } else {
-          taskInputRef.current?.focus();
-        }
+        if (activeEntry) handleStop();
+        else if (taskName.trim()) handleStart();
+        else taskInputRef.current?.focus();
       }
-
       if (e.key === "e" || e.key === "E") {
         e.preventDefault();
-        if (completedEntries.length > 0) {
-          handleEdit(completedEntries[0]);
-        }
+        if (completedEntries.length > 0) handleEdit(completedEntries[0]);
       }
-
       if (e.key === "m" || e.key === "M") {
         e.preventDefault();
         setShowManualEntry(true);
       }
     };
-
     document.addEventListener("keydown", handleKeydown);
     return () => document.removeEventListener("keydown", handleKeydown);
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -138,17 +124,10 @@ export default function TimeTracker() {
   const handleStart = async () => {
     const name = taskName.trim();
     if (!name) return;
-
-    // Save last used project
-    if (selectedProjectId) {
-      localStorage.setItem("lastProjectId", selectedProjectId);
-    }
-
+    if (selectedProjectId) localStorage.setItem("lastProjectId", selectedProjectId);
     const entry = await createEntry(name, selectedProjectId);
     if (entry) {
-      if (selectedTagIds.length > 0) {
-        await setEntryTags(entry.id, selectedTagIds);
-      }
+      if (selectedTagIds.length > 0) await setEntryTags(entry.id, selectedTagIds);
       await fetchEntries({ from: dateFrom, to: dateTo });
     }
   };
@@ -159,7 +138,6 @@ export default function TimeTracker() {
     if (success) {
       setTaskName("");
       setSelectedTagIds([]);
-      // Keep the project selected for next entry (auto-select)
       await fetchEntries({ from: dateFrom, to: dateTo });
     }
   };
@@ -182,25 +160,16 @@ export default function TimeTracker() {
     [getEntryTags]
   );
 
-  const handleSaveEdit = async (
-    id: string,
-    updates: {
-      task_name?: string;
-      started_at?: string;
-      ended_at?: string;
-      project_id?: string | null;
-    }
-  ) => {
+  const handleSaveEdit = async (id: string, updates: {
+    task_name?: string; started_at?: string; ended_at?: string; project_id?: string | null;
+  }) => {
     const success = await updateEntry(id, updates);
     if (success) await fetchEntries({ from: dateFrom, to: dateTo });
     return success;
   };
 
   const handleManualEntry = async (data: {
-    task_name: string;
-    started_at: string;
-    ended_at: string;
-    project_id?: string | null;
+    task_name: string; started_at: string; ended_at: string; project_id?: string | null;
   }) => {
     const entry = await createManualEntry(data);
     if (entry) await fetchEntries({ from: dateFrom, to: dateTo });
@@ -214,243 +183,232 @@ export default function TimeTracker() {
   };
 
   const isRunning = !!activeEntry;
+  const isFirstTime = completedEntries.length === 0 && projects.length === 0 && !isRunning;
 
-  const viewModes: { key: ViewMode; label: string }[] = [
-    { key: "list", label: "List" },
-    { key: "projects", label: "Projects" },
-    { key: "daily", label: "Daily" },
-    { key: "weekly", label: "Weekly" },
-    { key: "monthly", label: "Monthly" },
-    { key: "dashboard", label: "Dashboard" },
+  const viewModes: { key: ViewMode; label: string; icon: string }[] = [
+    { key: "list", label: "List", icon: "list" },
+    { key: "projects", label: "Projects", icon: "folder" },
+    { key: "daily", label: "Daily", icon: "calendar" },
+    { key: "weekly", label: "Weekly", icon: "bar" },
+    { key: "monthly", label: "Monthly", icon: "grid" },
+    { key: "dashboard", label: "Charts", icon: "chart" },
   ];
 
   if (loading) {
     return (
       <div className="flex items-center justify-center py-20 animate-fade-in">
-        <div className="flex items-center gap-2 text-[var(--muted)]">
-          <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-          </svg>
-          Loading...
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-8 h-8 rounded-full border-2 border-[var(--accent)] border-t-transparent animate-spin" />
+          <span className="text-xs text-[var(--muted)]">Loading your data...</span>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="w-full max-w-2xl mx-auto space-y-6 stagger-children">
-      {/* Timer Section */}
-      <div className="glass-card rounded-2xl p-8 animate-fade-in-scale">
-        <div className="text-center mb-6">
+    <div className="w-full max-w-3xl mx-auto space-y-5">
+      {/* Onboarding for first-time users */}
+      {isFirstTime && (
+        <div className="glass-card rounded-2xl p-6 sm:p-8 animate-fade-in-scale border-[var(--accent-medium)]" style={{ borderColor: "var(--accent-medium)" }}>
+          <div className="flex flex-col items-center text-center">
+            <div className="w-12 h-12 rounded-2xl bg-[var(--accent-soft)] flex items-center justify-center mb-4">
+              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20Z"/><path d="m9 12 2 2 4-4"/>
+              </svg>
+            </div>
+            <h2 className="text-lg font-semibold text-[var(--foreground)]">Welcome to Time Tracker</h2>
+            <p className="text-sm text-[var(--muted)] mt-1.5 max-w-md">
+              Track your work hours and bill clients with ease. Here&apos;s how to get started:
+            </p>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-6 w-full max-w-lg">
+              <button
+                onClick={() => setShowProjectManager(true)}
+                className="btn-premium glass-card rounded-xl p-4 text-left cursor-pointer hover:border-[var(--accent)]"
+                style={{ transition: "border-color 0.2s" }}
+              >
+                <div className="text-lg mb-1">1</div>
+                <div className="text-xs font-semibold text-[var(--foreground)]">Create a Project</div>
+                <div className="text-[10px] text-[var(--muted)] mt-0.5">Add your client and hourly rate</div>
+              </button>
+              <div className="glass-card rounded-xl p-4 text-left opacity-60">
+                <div className="text-lg mb-1">2</div>
+                <div className="text-xs font-semibold text-[var(--foreground)]">Start Tracking</div>
+                <div className="text-[10px] text-[var(--muted)] mt-0.5">Type a task and hit Start</div>
+              </div>
+              <div className="glass-card rounded-xl p-4 text-left opacity-60">
+                <div className="text-lg mb-1">3</div>
+                <div className="text-xs font-semibold text-[var(--foreground)]">Bill &amp; Invoice</div>
+                <div className="text-[10px] text-[var(--muted)] mt-0.5">Export CSV or generate PDF</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ===== HERO: Timer Section ===== */}
+      <div className="glass-card rounded-2xl p-6 sm:p-8 animate-fade-in-scale">
+        {/* Timer display */}
+        <div className="text-center mb-5">
           <div
-            className={`timer-display text-5xl font-mono font-bold text-[var(--foreground)] ${
-              isRunning ? "animate-pulse-glow rounded-xl inline-block px-4 py-2" : ""
+            className={`timer-display text-4xl sm:text-5xl font-mono font-bold text-[var(--foreground)] inline-block ${
+              isRunning ? "animate-pulse-glow rounded-xl px-4 py-2" : ""
             }`}
           >
             {formatDuration(elapsed)}
           </div>
           {isRunning && (
-            <div className="flex items-center justify-center gap-1.5 mt-3">
+            <div className="flex items-center justify-center gap-1.5 mt-2.5">
               <span className="relative flex h-2 w-2">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[var(--danger)] opacity-75" />
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-[var(--danger)]" />
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[var(--accent)] opacity-75" />
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-[var(--accent)]" />
               </span>
-              <span className="text-xs font-medium text-[var(--danger)] tracking-wide uppercase">
+              <span className="text-[10px] font-semibold text-[var(--accent)] tracking-widest uppercase">
                 Recording
               </span>
             </div>
           )}
         </div>
 
-        <div className="space-y-4">
-          <div>
-            <label className="block text-[10px] font-medium text-[var(--muted)] uppercase tracking-wider mb-1">
-              Task
-            </label>
-            <div className="flex gap-2.5">
-              <input
-                ref={taskInputRef}
-                type="text"
-                placeholder="What are you working on?"
-                value={taskName}
-                onChange={(e) => setTaskName(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && !isRunning) handleStart();
-                }}
-                disabled={isRunning}
-                className="input-premium flex-1 px-4 py-2.5 rounded-xl text-[var(--foreground)] placeholder-[var(--muted)] disabled:opacity-40 text-sm"
-              />
-              {isRunning ? (
-                <button
-                  onClick={handleStop}
-                  className="btn-premium px-6 py-2.5 rounded-xl bg-[var(--danger)] hover:bg-red-600 text-white font-semibold text-sm cursor-pointer shadow-sm"
-                >
-                  Stop
-                </button>
-              ) : (
-                <button
-                  onClick={handleStart}
-                  disabled={!taskName.trim()}
-                  className="btn-premium px-6 py-2.5 rounded-xl bg-[var(--accent)] hover:bg-blue-600 disabled:bg-[var(--card-border)] disabled:text-[var(--muted)] text-white font-semibold text-sm disabled:cursor-not-allowed cursor-pointer shadow-sm"
-                >
-                  Start
-                </button>
-              )}
-            </div>
+        {/* Task input */}
+        <div className="space-y-3">
+          <div className="flex gap-2">
+            <input
+              ref={taskInputRef}
+              type="text"
+              placeholder="What are you working on?"
+              value={taskName}
+              onChange={(e) => setTaskName(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter" && !isRunning) handleStart(); }}
+              disabled={isRunning}
+              className="input-premium flex-1 px-4 py-2.5 rounded-xl text-[var(--foreground)] placeholder-[var(--muted-light)] disabled:opacity-40 text-sm"
+            />
+            {isRunning ? (
+              <button onClick={handleStop} className="btn-premium px-5 sm:px-6 py-2.5 rounded-xl bg-[var(--danger)] hover:bg-red-600 text-white font-semibold text-sm cursor-pointer shadow-sm whitespace-nowrap">
+                Stop
+              </button>
+            ) : (
+              <button onClick={handleStart} disabled={!taskName.trim()} className="btn-premium px-5 sm:px-6 py-2.5 rounded-xl bg-[var(--accent)] hover:bg-[var(--accent-hover)] disabled:bg-[var(--card-border)] disabled:text-[var(--muted)] text-white font-semibold text-sm disabled:cursor-not-allowed cursor-pointer shadow-sm whitespace-nowrap">
+                Start
+              </button>
+            )}
           </div>
 
+          {/* Project selector */}
           <ProjectSelector
             projects={projects}
             selectedId={selectedProjectId}
             onChange={setSelectedProjectId}
             disabled={isRunning}
             onQuickCreate={async (name, clientName) => {
-              const project = await createProject({
-                name,
-                client_name: clientName || undefined,
-              });
-              return project;
+              return await createProject({ name, client_name: clientName || undefined });
             }}
           />
 
+          {/* Tags */}
           {tags.length > 0 && (
             <div>
-              <label className="block text-[10px] font-medium text-[var(--muted)] uppercase tracking-wider mb-1">
-                Tags
-              </label>
-              <TagSelector
-                tags={tags}
-                selectedIds={selectedTagIds}
-                onChange={setSelectedTagIds}
-                disabled={isRunning}
-              />
+              <span className="section-label">Tags</span>
+              <div className="mt-1">
+                <TagSelector tags={tags} selectedIds={selectedTagIds} onChange={setSelectedTagIds} disabled={isRunning} />
+              </div>
             </div>
           )}
         </div>
 
-        {/* Keyboard hints */}
-        <div className="flex items-center justify-center gap-4 mt-5 pt-4 border-t border-[var(--card-border)]">
-          <span className="text-[10px] text-[var(--muted)]">
-            <kbd className="px-1.5 py-0.5 rounded bg-[var(--card-border)] font-mono text-[9px]">S</kbd> Start/Stop
-          </span>
-          <span className="text-[10px] text-[var(--muted)]">
-            <kbd className="px-1.5 py-0.5 rounded bg-[var(--card-border)] font-mono text-[9px]">E</kbd> Edit last
-          </span>
-          <span className="text-[10px] text-[var(--muted)]">
-            <kbd className="px-1.5 py-0.5 rounded bg-[var(--card-border)] font-mono text-[9px]">M</kbd> Manual entry
-          </span>
+        {/* Keyboard hints - hidden on mobile */}
+        <div className="hidden sm:flex items-center justify-center gap-4 mt-5 pt-4 border-t border-[var(--card-border)]">
+          {[
+            { key: "S", label: "Start / Stop" },
+            { key: "E", label: "Edit last" },
+            { key: "M", label: "Manual entry" },
+          ].map(({ key, label }) => (
+            <span key={key} className="text-[10px] text-[var(--muted-light)]">
+              <kbd className="inline-flex items-center justify-center w-4 h-4 rounded bg-[var(--card-border)] font-mono text-[8px] text-[var(--muted)] mr-1">{key}</kbd>
+              {label}
+            </span>
+          ))}
         </div>
       </div>
 
-      {/* Toolbar */}
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <div className="flex items-center">
-          <div className="flex glass-card rounded-xl overflow-hidden p-0.5">
-            {viewModes.map(({ key, label }) => (
-              <button
-                key={key}
-                onClick={() => setViewMode(key)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer ${
-                  viewMode === key
-                    ? "bg-[var(--accent)] text-white shadow-sm"
-                    : "text-[var(--muted)] hover:text-[var(--foreground)]"
-                }`}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
+      {/* ===== SECONDARY: Controls Bar ===== */}
+      <div className="flex items-center justify-between gap-2 flex-wrap">
+        {/* View tabs - horizontal scroll on mobile */}
+        <div className="flex glass-card rounded-xl overflow-x-auto p-0.5 max-w-full scrollbar-none" style={{ scrollbarWidth: "none" }}>
+          {viewModes.map(({ key, label }) => (
+            <button
+              key={key}
+              onClick={() => setViewMode(key)}
+              className={`px-2.5 sm:px-3 py-1.5 rounded-lg text-[11px] font-medium transition-all cursor-pointer whitespace-nowrap ${
+                viewMode === key
+                  ? "bg-[var(--accent)] text-white shadow-sm"
+                  : "text-[var(--muted)] hover:text-[var(--foreground)]"
+              }`}
+            >
+              {label}
+            </button>
+          ))}
         </div>
 
-        <div className="flex items-center gap-1.5">
+        {/* Actions dropdown */}
+        <div className="relative" ref={actionsRef}>
           <button
-            onClick={() => setShowManualEntry(true)}
-            className="btn-premium inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg glass-card text-[var(--muted)] hover:text-[var(--foreground)] text-xs font-medium cursor-pointer"
-            title="Add manual entry"
+            onClick={() => setShowActionsMenu(!showActionsMenu)}
+            className="btn-premium flex items-center gap-1.5 px-3 py-1.5 rounded-xl glass-card text-[var(--muted)] hover:text-[var(--foreground)] text-xs font-medium cursor-pointer"
           >
-            <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
-            Add
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg>
+            <span className="hidden sm:inline">Actions</span>
           </button>
-          <ExportCSV entries={completedEntries} />
-          <button
-            onClick={() => setShowInvoice(true)}
-            className="btn-premium inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg glass-card text-[var(--muted)] hover:text-[var(--foreground)] text-xs font-medium cursor-pointer"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
-            Invoice
-          </button>
-          <button
-            onClick={() => setShowProjectManager(true)}
-            className="btn-premium px-3 py-1.5 rounded-lg glass-card text-[var(--muted)] hover:text-[var(--foreground)] text-xs font-medium cursor-pointer"
-          >
-            Projects
-          </button>
-          <button
-            onClick={() => setShowTagManager(true)}
-            className="btn-premium px-3 py-1.5 rounded-lg glass-card text-[var(--muted)] hover:text-[var(--foreground)] text-xs font-medium cursor-pointer"
-          >
-            Tags
-          </button>
+
+          {showActionsMenu && (
+            <div className="absolute right-0 top-full mt-1.5 w-48 glass-card rounded-xl shadow-xl z-30 py-1 animate-fade-in-scale">
+              {[
+                { label: "Add Manual Entry", icon: <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 5v14"/><path d="M5 12h14"/></svg>, action: () => setShowManualEntry(true) },
+                { label: "Export CSV", icon: <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>, action: () => { if (completedEntries.length > 0) { import("@/lib/csv").then(m => m.downloadCSV(completedEntries)); } } },
+                { label: "Generate Invoice", icon: <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>, action: () => setShowInvoice(true) },
+                { label: "divider" },
+                { label: "Manage Projects", icon: <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></svg>, action: () => setShowProjectManager(true) },
+                { label: "Manage Tags", icon: <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m15 5 6.3 6.3a2.4 2.4 0 0 1 0 3.4L17 19"/><path d="M9.586 5.586A2 2 0 0 0 8.172 5H3a1 1 0 0 0-1 1v5.172a2 2 0 0 0 .586 1.414L8 18"/><circle cx="6.5" cy="9.5" r=".5" fill="currentColor"/></svg>, action: () => setShowTagManager(true) },
+              ].map((item, i) =>
+                item.label === "divider" ? (
+                  <div key={i} className="my-1 border-t border-[var(--card-border)]" />
+                ) : (
+                  <button
+                    key={item.label}
+                    onClick={() => { item.action?.(); setShowActionsMenu(false); }}
+                    className="w-full flex items-center gap-2.5 px-3 py-2 text-xs text-[var(--foreground)] hover:bg-[var(--surface-hover)] transition cursor-pointer"
+                  >
+                    <span className="text-[var(--muted)]">{item.icon}</span>
+                    {item.label}
+                  </button>
+                )
+              )}
+            </div>
+          )}
         </div>
       </div>
 
-      {/* Date Filter */}
+      {/* ===== TERTIARY: Filters ===== */}
       <DateRangeFilter onFilter={handleDateFilter} />
 
-      {/* Summary */}
+      {/* ===== Summary ===== */}
       <SummaryBar entries={completedEntries} />
 
-      {/* Content */}
-      {viewMode === "list" && (
-        <EntryList entries={completedEntries} onEdit={handleEdit} onDelete={handleDelete} onDuplicate={handleDuplicate} />
-      )}
-      {viewMode === "projects" && (
-        <ProjectFolders entries={completedEntries} projects={projects} onEdit={handleEdit} onDelete={handleDelete} />
-      )}
-      {viewMode === "daily" && <DailySummary entries={completedEntries} />}
-      {viewMode === "weekly" && <WeeklySummary entries={completedEntries} />}
-      {viewMode === "monthly" && <MonthlyReport entries={completedEntries} projects={projects} />}
-      {viewMode === "dashboard" && <Dashboard entries={completedEntries} />}
+      {/* ===== Content ===== */}
+      <div className="min-h-[200px]">
+        {viewMode === "list" && <EntryList entries={completedEntries} onEdit={handleEdit} onDelete={handleDelete} onDuplicate={handleDuplicate} />}
+        {viewMode === "projects" && <ProjectFolders entries={completedEntries} projects={projects} onEdit={handleEdit} onDelete={handleDelete} />}
+        {viewMode === "daily" && <DailySummary entries={completedEntries} />}
+        {viewMode === "weekly" && <WeeklySummary entries={completedEntries} />}
+        {viewMode === "monthly" && <MonthlyReport entries={completedEntries} projects={projects} />}
+        {viewMode === "dashboard" && <Dashboard entries={completedEntries} />}
+      </div>
 
-      {/* Modals */}
-      <ProjectManager
-        open={showProjectManager}
-        onClose={() => setShowProjectManager(false)}
-        projects={projects}
-        onCreateProject={createProject}
-        onUpdateProject={updateProject}
-        onDeleteProject={deleteProject}
-      />
-      <TagManager
-        open={showTagManager}
-        onClose={() => setShowTagManager(false)}
-        tags={tags}
-        onCreateTag={createTag}
-        onDeleteTag={deleteTag}
-      />
-      <EntryEditModal
-        entry={editingEntry?.entry || null}
-        open={!!editingEntry}
-        onClose={() => setEditingEntry(null)}
-        onSave={handleSaveEdit}
-        projects={projects}
-        tags={tags}
-        entryTagIds={editingEntry?.tagIds || []}
-        onSaveTags={setEntryTags}
-      />
-      <InvoiceGenerator
-        open={showInvoice}
-        onClose={() => setShowInvoice(false)}
-        entries={completedEntries}
-        projects={projects}
-      />
-      <ManualEntryModal
-        open={showManualEntry}
-        onClose={() => setShowManualEntry(false)}
-        onSave={handleManualEntry}
-        projects={projects}
-      />
+      {/* ===== Modals ===== */}
+      <ProjectManager open={showProjectManager} onClose={() => setShowProjectManager(false)} projects={projects} onCreateProject={createProject} onUpdateProject={updateProject} onDeleteProject={deleteProject} />
+      <TagManager open={showTagManager} onClose={() => setShowTagManager(false)} tags={tags} onCreateTag={createTag} onDeleteTag={deleteTag} />
+      <EntryEditModal entry={editingEntry?.entry || null} open={!!editingEntry} onClose={() => setEditingEntry(null)} onSave={handleSaveEdit} projects={projects} tags={tags} entryTagIds={editingEntry?.tagIds || []} onSaveTags={setEntryTags} />
+      <InvoiceGenerator open={showInvoice} onClose={() => setShowInvoice(false)} entries={completedEntries} projects={projects} />
+      <ManualEntryModal open={showManualEntry} onClose={() => setShowManualEntry(false)} onSave={handleManualEntry} projects={projects} />
     </div>
   );
 }
