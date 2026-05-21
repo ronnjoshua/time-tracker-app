@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { formatDuration } from "@/lib/format";
 import { useEntries } from "@/hooks/useEntries";
-import { useTimer } from "@/hooks/useTimer";
+import { useTimer, startPause, endPause, clearPause, getPausedSeconds } from "@/hooks/useTimer";
 import { useProjects } from "@/hooks/useProjects";
 import { useTags } from "@/hooks/useTags";
 import ProjectSelector from "./ProjectSelector";
@@ -34,7 +34,9 @@ export default function TimeTracker() {
 
   const { projects, fetchProjects, createProject, updateProject, deleteProject } = useProjects();
   const { tags, fetchTags, createTag, deleteTag, getEntryTags, setEntryTags } = useTags();
-  const elapsed = useTimer(activeEntry);
+
+  const [paused, setPaused] = useState(false);
+  const elapsed = useTimer(activeEntry, paused);
 
   const [taskName, setTaskName] = useState("");
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
@@ -111,6 +113,13 @@ export default function TimeTracker() {
         e.preventDefault();
         if (completedEntries.length > 0) handleEdit(completedEntries[0]);
       }
+      if (e.key === "p" || e.key === "P") {
+        e.preventDefault();
+        if (activeEntry) {
+          if (paused) handleResume();
+          else handlePause();
+        }
+      }
       if (e.key === "m" || e.key === "M") {
         e.preventDefault();
         setShowManualEntry(true);
@@ -132,10 +141,27 @@ export default function TimeTracker() {
     }
   };
 
+  const handlePause = () => {
+    if (!activeEntry) return;
+    startPause(activeEntry.id);
+    setPaused(true);
+  };
+
+  const handleResume = () => {
+    if (!activeEntry) return;
+    endPause(activeEntry.id);
+    setPaused(false);
+  };
+
   const handleStop = async () => {
     if (!activeEntry) return;
-    const success = await stopEntry(activeEntry);
+    // If paused, resume first to finalize pause tracking
+    if (paused) endPause(activeEntry.id);
+    const pausedSecs = getPausedSeconds(activeEntry.id);
+    const success = await stopEntry(activeEntry, pausedSecs);
     if (success) {
+      clearPause(activeEntry.id);
+      setPaused(false);
       setTaskName("");
       setSelectedTagIds([]);
       await fetchEntries({ from: dateFrom, to: dateTo });
@@ -258,13 +284,26 @@ export default function TimeTracker() {
           </div>
           {isRunning && (
             <div className="flex items-center justify-center gap-1.5 mt-2.5">
-              <span className="relative flex h-2 w-2">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[var(--accent)] opacity-75" />
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-[var(--accent)]" />
-              </span>
-              <span className="text-[10px] font-semibold text-[var(--accent)] tracking-widest uppercase">
-                Recording
-              </span>
+              {paused ? (
+                <>
+                  <span className="relative flex h-2 w-2">
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-[var(--warning)]" />
+                  </span>
+                  <span className="text-[10px] font-semibold text-[var(--warning)] tracking-widest uppercase">
+                    Paused
+                  </span>
+                </>
+              ) : (
+                <>
+                  <span className="relative flex h-2 w-2">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[var(--accent)] opacity-75" />
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-[var(--accent)]" />
+                  </span>
+                  <span className="text-[10px] font-semibold text-[var(--accent)] tracking-widest uppercase">
+                    Recording
+                  </span>
+                </>
+              )}
             </div>
           )}
         </div>
@@ -283,9 +322,20 @@ export default function TimeTracker() {
               className="input-premium flex-1 px-4 py-2.5 rounded-xl text-[var(--foreground)] placeholder-[var(--muted-light)] disabled:opacity-40 text-sm"
             />
             {isRunning ? (
-              <button onClick={handleStop} className="btn-premium px-5 sm:px-6 py-2.5 rounded-xl bg-[var(--danger)] hover:bg-red-600 text-white font-semibold text-sm cursor-pointer shadow-sm whitespace-nowrap">
-                Stop
-              </button>
+              <div className="flex gap-1.5">
+                {paused ? (
+                  <button onClick={handleResume} className="btn-premium px-4 sm:px-5 py-2.5 rounded-xl bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white font-semibold text-sm cursor-pointer shadow-sm whitespace-nowrap active:scale-95">
+                    Resume
+                  </button>
+                ) : (
+                  <button onClick={handlePause} className="btn-premium px-4 sm:px-5 py-2.5 rounded-xl bg-[var(--warning)] hover:bg-amber-600 text-white font-semibold text-sm cursor-pointer shadow-sm whitespace-nowrap active:scale-95">
+                    Pause
+                  </button>
+                )}
+                <button onClick={handleStop} className="btn-premium px-4 sm:px-5 py-2.5 rounded-xl bg-[var(--danger)] hover:bg-red-600 text-white font-semibold text-sm cursor-pointer shadow-sm whitespace-nowrap active:scale-95">
+                  Stop
+                </button>
+              </div>
             ) : (
               <button onClick={handleStart} disabled={!taskName.trim()} className="btn-premium px-5 sm:px-6 py-2.5 rounded-xl bg-[var(--accent)] hover:bg-[var(--accent-hover)] disabled:bg-[var(--card-border)] disabled:text-[var(--muted)] text-white font-semibold text-sm disabled:cursor-not-allowed cursor-pointer shadow-sm whitespace-nowrap">
                 Start
@@ -319,6 +369,7 @@ export default function TimeTracker() {
         <div className="hidden sm:flex items-center justify-center gap-4 mt-5 pt-4 border-t border-[var(--card-border)]">
           {[
             { key: "S", label: "Start / Stop" },
+            { key: "P", label: "Pause" },
             { key: "E", label: "Edit last" },
             { key: "M", label: "Manual entry" },
           ].map(({ key, label }) => (

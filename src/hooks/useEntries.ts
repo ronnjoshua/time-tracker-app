@@ -54,10 +54,10 @@ export function useEntries() {
     return data as TimeEntry;
   };
 
-  const stopEntry = async (entry: TimeEntry) => {
+  const stopEntry = async (entry: TimeEntry, pausedSeconds: number = 0) => {
     const now = new Date().toISOString();
     const start = new Date(entry.started_at).getTime();
-    const durationSeconds = Math.floor((Date.now() - start) / 1000);
+    const durationSeconds = Math.floor((Date.now() - start) / 1000) - pausedSeconds;
 
     const { error } = await supabase
       .from("time_entries")
