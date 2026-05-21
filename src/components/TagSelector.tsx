@@ -9,18 +9,10 @@ type TagSelectorProps = {
   disabled?: boolean;
 };
 
-export default function TagSelector({
-  tags,
-  selectedIds,
-  onChange,
-  disabled,
-}: TagSelectorProps) {
+export default function TagSelector({ tags, selectedIds, onChange, disabled }: TagSelectorProps) {
   const toggle = (id: string) => {
-    if (selectedIds.includes(id)) {
-      onChange(selectedIds.filter((t) => t !== id));
-    } else {
-      onChange([...selectedIds, id]);
-    }
+    if (selectedIds.includes(id)) onChange(selectedIds.filter((t) => t !== id));
+    else onChange([...selectedIds, id]);
   };
 
   if (tags.length === 0) return null;
@@ -34,10 +26,8 @@ export default function TagSelector({
             key={tag.id}
             onClick={() => toggle(tag.id)}
             disabled={disabled}
-            className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium transition cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed ${
-              selected
-                ? "ring-2 ring-offset-1 dark:ring-offset-zinc-900"
-                : "opacity-60 hover:opacity-100"
+            className={`inline-flex items-center px-3 py-1.5 rounded-full text-xs font-medium transition cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed min-h-[32px] active:scale-95 ${
+              selected ? "ring-2 ring-offset-1 ring-offset-[var(--card)]" : "opacity-50 hover:opacity-80"
             }`}
             style={{
               backgroundColor: tag.color + "20",

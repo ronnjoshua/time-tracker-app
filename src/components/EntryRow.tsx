@@ -25,50 +25,48 @@ export default function EntryRow({ entry, onEdit, onDelete, onDuplicate }: Entry
   };
 
   return (
-    <div className="group glass-card rounded-xl p-4 flex items-center justify-between">
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2">
-          <span className="text-sm font-medium text-[var(--foreground)] truncate">
-            {entry.task_name}
-          </span>
-          {entry.project && (
-            <span
-              className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold text-white shrink-0 uppercase tracking-wide"
-              style={{ backgroundColor: entry.project.color }}
-            >
-              {entry.project.name}
+    <div className="glass-card rounded-xl p-3 sm:p-4">
+      {/* Top row: task info + duration */}
+      <div className="flex items-start justify-between gap-2">
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <span className="text-sm font-medium text-[var(--foreground)] break-words">
+              {entry.task_name}
             </span>
-          )}
-        </div>
-        <div className="text-xs text-[var(--muted)] mt-1">
-          {formatDate(entry.started_at)} &middot;{" "}
-          {formatTime(entry.started_at)} &ndash;{" "}
-          {entry.ended_at ? formatTime(entry.ended_at) : "ongoing"}
-          {entry.project?.client_name && (
-            <span className="ml-2 opacity-60">
-              &middot; {entry.project.client_name}
-            </span>
-          )}
-        </div>
-        {entry.tags && entry.tags.length > 0 && (
-          <div className="flex gap-1 mt-1.5">
-            {entry.tags.map((tag) => (
+            {entry.project && (
               <span
-                key={tag.id}
-                className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium"
-                style={{
-                  backgroundColor: tag.color + "15",
-                  color: tag.color,
-                }}
+                className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-semibold text-white shrink-0 uppercase tracking-wide"
+                style={{ backgroundColor: entry.project.color }}
               >
-                {tag.name}
+                {entry.project.name}
               </span>
-            ))}
+            )}
           </div>
-        )}
-      </div>
-      <div className="flex items-center gap-3 ml-4">
-        <div className="text-right">
+          <div className="text-xs text-[var(--muted)] mt-1">
+            {formatDate(entry.started_at)} &middot;{" "}
+            {formatTime(entry.started_at)} &ndash;{" "}
+            {entry.ended_at ? formatTime(entry.ended_at) : "ongoing"}
+            {entry.project?.client_name && (
+              <span className="ml-1.5 opacity-60">
+                &middot; {entry.project.client_name}
+              </span>
+            )}
+          </div>
+          {entry.tags && entry.tags.length > 0 && (
+            <div className="flex flex-wrap gap-1 mt-1.5">
+              {entry.tags.map((tag) => (
+                <span
+                  key={tag.id}
+                  className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium"
+                  style={{ backgroundColor: tag.color + "15", color: tag.color }}
+                >
+                  {tag.name}
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
+        <div className="text-right shrink-0">
           <div className="font-mono text-sm font-semibold text-[var(--foreground)] timer-display">
             {formatDuration(entry.duration_seconds || 0)}
           </div>
@@ -81,40 +79,47 @@ export default function EntryRow({ entry, onEdit, onDelete, onDuplicate }: Entry
             )}
           </div>
         </div>
-        <div className="flex gap-0.5 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
-          {/* Duplicate */}
-          <button
-            onClick={() => onDuplicate(entry)}
-            className="p-1.5 rounded-lg text-[var(--muted)] hover:text-[var(--accent)] hover:bg-[var(--accent-soft)] transition cursor-pointer"
-            title="Duplicate entry"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M4 16V4a2 2 0 0 1 2-2h12"/></svg>
-          </button>
-          {/* Edit */}
-          <button
-            onClick={() => onEdit(entry)}
-            className="p-1.5 rounded-lg text-[var(--muted)] hover:text-[var(--accent)] hover:bg-[var(--accent-soft)] transition cursor-pointer"
-            title="Edit entry"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/></svg>
-          </button>
-          {/* Delete with confirmation */}
-          <button
-            onClick={handleDelete}
-            className={`p-1.5 rounded-lg transition cursor-pointer ${
-              confirmDelete
-                ? "bg-[var(--danger)] text-white"
-                : "text-[var(--muted)] hover:text-[var(--danger)] hover:bg-[var(--danger-soft)]"
-            }`}
-            title={confirmDelete ? "Click again to confirm" : "Delete entry"}
-          >
-            {confirmDelete ? (
+      </div>
+
+      {/* Action buttons - always visible on mobile, hover on desktop */}
+      <div className="flex items-center justify-end gap-1 mt-2 pt-2 border-t border-[var(--card-border)] sm:border-0 sm:mt-0 sm:pt-0 sm:absolute sm:right-4 sm:top-1/2 sm:-translate-y-1/2 sm:opacity-0 sm:group-hover:opacity-100 sm:transition-opacity">
+        <button
+          onClick={() => onDuplicate(entry)}
+          className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[var(--muted)] hover:text-[var(--accent)] hover:bg-[var(--accent-soft)] active:bg-[var(--accent-medium)] transition cursor-pointer text-[11px]"
+          title="Duplicate"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M4 16V4a2 2 0 0 1 2-2h12"/></svg>
+          <span className="sm:hidden">Copy</span>
+        </button>
+        <button
+          onClick={() => onEdit(entry)}
+          className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[var(--muted)] hover:text-[var(--accent)] hover:bg-[var(--accent-soft)] active:bg-[var(--accent-medium)] transition cursor-pointer text-[11px]"
+          title="Edit"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/></svg>
+          <span className="sm:hidden">Edit</span>
+        </button>
+        <button
+          onClick={handleDelete}
+          className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg transition cursor-pointer text-[11px] ${
+            confirmDelete
+              ? "bg-[var(--danger)] text-white"
+              : "text-[var(--muted)] hover:text-[var(--danger)] hover:bg-[var(--danger-soft)] active:bg-[var(--danger-soft)]"
+          }`}
+          title={confirmDelete ? "Tap again to confirm" : "Delete"}
+        >
+          {confirmDelete ? (
+            <>
               <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
-            ) : (
+              <span className="sm:hidden">Confirm</span>
+            </>
+          ) : (
+            <>
               <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
-            )}
-          </button>
-        </div>
+              <span className="sm:hidden">Delete</span>
+            </>
+          )}
+        </button>
       </div>
     </div>
   );
