@@ -19,8 +19,9 @@ import WeeklySummary from "./WeeklySummary";
 import ExportCSV from "./ExportCSV";
 import Dashboard from "./Dashboard";
 import InvoiceGenerator from "./InvoiceGenerator";
+import ProjectFolders from "./ProjectFolders";
 
-type ViewMode = "list" | "daily" | "weekly" | "dashboard";
+type ViewMode = "list" | "projects" | "daily" | "weekly" | "dashboard";
 
 export default function TimeTracker() {
   const {
@@ -151,6 +152,7 @@ export default function TimeTracker() {
 
   const viewModes: { key: ViewMode; label: string }[] = [
     { key: "list", label: "List" },
+    { key: "projects", label: "Projects" },
     { key: "daily", label: "Daily" },
     { key: "weekly", label: "Weekly" },
     { key: "dashboard", label: "Dashboard" },
@@ -278,6 +280,14 @@ export default function TimeTracker() {
       {viewMode === "list" && (
         <EntryList
           entries={completedEntries}
+          onEdit={handleEdit}
+          onDelete={handleDelete}
+        />
+      )}
+      {viewMode === "projects" && (
+        <ProjectFolders
+          entries={completedEntries}
+          projects={projects}
           onEdit={handleEdit}
           onDelete={handleDelete}
         />
