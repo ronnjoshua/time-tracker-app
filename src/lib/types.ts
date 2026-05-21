@@ -20,6 +20,8 @@ export type Project = {
   hourly_rate: number | null;
   color: string;
   archived: boolean;
+  budget_hours: number | null;
+  notes: string | null;
   created_at: string;
 };
 

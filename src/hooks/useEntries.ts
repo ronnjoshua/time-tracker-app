@@ -100,6 +100,65 @@ export function useEntries() {
     return true;
   };
 
+  const createManualEntry = async (data: {
+    task_name: string;
+    started_at: string;
+    ended_at: string;
+    project_id?: string | null;
+  }) => {
+    const start = new Date(data.started_at).getTime();
+    const end = new Date(data.ended_at).getTime();
+    const durationSeconds = Math.floor((end - start) / 1000);
+
+    const insertData: Record<string, unknown> = {
+      task_name: data.task_name,
+      started_at: data.started_at,
+      ended_at: data.ended_at,
+      duration_seconds: durationSeconds,
+    };
+    if (data.project_id) insertData.project_id = data.project_id;
+
+    const { data: entry, error } = await supabase
+      .from("time_entries")
+      .insert(insertData)
+      .select("*, project:projects(*)")
+      .single();
+
+    if (error) {
+      console.error("Error creating manual entry:", error);
+      return null;
+    }
+
+    return entry as TimeEntry;
+  };
+
+  const duplicateEntry = async (entry: TimeEntry) => {
+    const now = new Date();
+    const durationMs = (entry.duration_seconds || 0) * 1000;
+    const startedAt = new Date(now.getTime() - durationMs).toISOString();
+
+    const insertData: Record<string, unknown> = {
+      task_name: entry.task_name,
+      started_at: startedAt,
+      ended_at: now.toISOString(),
+      duration_seconds: entry.duration_seconds,
+    };
+    if (entry.project_id) insertData.project_id = entry.project_id;
+
+    const { data, error } = await supabase
+      .from("time_entries")
+      .insert(insertData)
+      .select("*, project:projects(*)")
+      .single();
+
+    if (error) {
+      console.error("Error duplicating entry:", error);
+      return null;
+    }
+
+    return data as TimeEntry;
+  };
+
   const deleteEntry = async (id: string) => {
     const { error } = await supabase
       .from("time_entries")
@@ -123,6 +182,8 @@ export function useEntries() {
     loading,
     fetchEntries,
     createEntry,
+    createManualEntry,
+    duplicateEntry,
     stopEntry,
     updateEntry,
     deleteEntry,

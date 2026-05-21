@@ -11,6 +11,8 @@ create table if not exists projects (
   hourly_rate numeric(10,2),
   color text default '#3b82f6',
   archived boolean default false,
+  budget_hours numeric(10,2),
+  notes text,
   created_at timestamptz not null default now()
 );
 
@@ -59,3 +61,9 @@ create index if not exists idx_time_entries_project_id on time_entries (project_
 -- ============================================
 -- alter table time_entries add column if not exists project_id uuid references projects(id) on delete set null;
 -- alter table time_entries add column if not exists user_id uuid;
+
+-- ============================================
+-- MIGRATION: Add budget_hours and notes to projects:
+-- ============================================
+-- alter table projects add column if not exists budget_hours numeric(10,2);
+-- alter table projects add column if not exists notes text;

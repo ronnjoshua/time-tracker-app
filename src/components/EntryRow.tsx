@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { formatDuration, formatHours, formatDate, formatTime } from "@/lib/format";
 import type { TimeEntry } from "@/lib/types";
 
@@ -7,9 +8,22 @@ type EntryRowProps = {
   entry: TimeEntry;
   onEdit: (entry: TimeEntry) => void;
   onDelete: (id: string) => void;
+  onDuplicate: (entry: TimeEntry) => void;
 };
 
-export default function EntryRow({ entry, onEdit, onDelete }: EntryRowProps) {
+export default function EntryRow({ entry, onEdit, onDelete, onDuplicate }: EntryRowProps) {
+  const [confirmDelete, setConfirmDelete] = useState(false);
+
+  const handleDelete = () => {
+    if (confirmDelete) {
+      onDelete(entry.id);
+      setConfirmDelete(false);
+    } else {
+      setConfirmDelete(true);
+      setTimeout(() => setConfirmDelete(false), 3000);
+    }
+  };
+
   return (
     <div className="group glass-card rounded-xl p-4 flex items-center justify-between">
       <div className="flex-1 min-w-0">
@@ -68,6 +82,15 @@ export default function EntryRow({ entry, onEdit, onDelete }: EntryRowProps) {
           </div>
         </div>
         <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+          {/* Duplicate */}
+          <button
+            onClick={() => onDuplicate(entry)}
+            className="p-1.5 rounded-lg text-[var(--muted)] hover:text-[var(--accent)] hover:bg-[var(--accent-soft)] transition cursor-pointer"
+            title="Duplicate entry"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M4 16V4a2 2 0 0 1 2-2h12"/></svg>
+          </button>
+          {/* Edit */}
           <button
             onClick={() => onEdit(entry)}
             className="p-1.5 rounded-lg text-[var(--muted)] hover:text-[var(--accent)] hover:bg-[var(--accent-soft)] transition cursor-pointer"
@@ -75,12 +98,21 @@ export default function EntryRow({ entry, onEdit, onDelete }: EntryRowProps) {
           >
             <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/></svg>
           </button>
+          {/* Delete with confirmation */}
           <button
-            onClick={() => onDelete(entry.id)}
-            className="p-1.5 rounded-lg text-[var(--muted)] hover:text-[var(--danger)] hover:bg-[var(--danger-soft)] transition cursor-pointer"
-            title="Delete entry"
+            onClick={handleDelete}
+            className={`p-1.5 rounded-lg transition cursor-pointer ${
+              confirmDelete
+                ? "bg-[var(--danger)] text-white"
+                : "text-[var(--muted)] hover:text-[var(--danger)] hover:bg-[var(--danger-soft)]"
+            }`}
+            title={confirmDelete ? "Click again to confirm" : "Delete entry"}
           >
-            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
+            {confirmDelete ? (
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+            ) : (
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
+            )}
           </button>
         </div>
       </div>

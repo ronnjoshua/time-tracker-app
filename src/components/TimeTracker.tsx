@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { formatDuration } from "@/lib/format";
 import { useEntries } from "@/hooks/useEntries";
 import { useTimer } from "@/hooks/useTimer";
@@ -20,8 +20,10 @@ import ExportCSV from "./ExportCSV";
 import Dashboard from "./Dashboard";
 import InvoiceGenerator from "./InvoiceGenerator";
 import ProjectFolders from "./ProjectFolders";
+import ManualEntryModal from "./ManualEntryModal";
+import MonthlyReport from "./MonthlyReport";
 
-type ViewMode = "list" | "projects" | "daily" | "weekly" | "dashboard";
+type ViewMode = "list" | "projects" | "daily" | "weekly" | "monthly" | "dashboard";
 
 export default function TimeTracker() {
   const {
@@ -30,6 +32,8 @@ export default function TimeTracker() {
     loading,
     fetchEntries,
     createEntry,
+    createManualEntry,
+    duplicateEntry,
     stopEntry,
     updateEntry,
     deleteEntry,
@@ -56,6 +60,7 @@ export default function TimeTracker() {
   const [showProjectManager, setShowProjectManager] = useState(false);
   const [showTagManager, setShowTagManager] = useState(false);
   const [showInvoice, setShowInvoice] = useState(false);
+  const [showManualEntry, setShowManualEntry] = useState(false);
   const [editingEntry, setEditingEntry] = useState<{
     entry: import("@/lib/types").TimeEntry;
     tagIds: string[];
@@ -63,6 +68,14 @@ export default function TimeTracker() {
 
   const [dateFrom, setDateFrom] = useState<string | undefined>();
   const [dateTo, setDateTo] = useState<string | undefined>();
+
+  const taskInputRef = useRef<HTMLInputElement>(null);
+
+  // Load last used project from localStorage
+  useEffect(() => {
+    const lastProject = localStorage.getItem("lastProjectId");
+    if (lastProject) setSelectedProjectId(lastProject);
+  }, []);
 
   useEffect(() => {
     fetchEntries();
@@ -77,9 +90,60 @@ export default function TimeTracker() {
     }
   }, [activeEntry]);
 
+  // Tab title timer
+  useEffect(() => {
+    if (activeEntry && elapsed > 0) {
+      document.title = `${formatDuration(elapsed)} - Time Tracker`;
+    } else {
+      document.title = "Time Tracker";
+    }
+  }, [elapsed, activeEntry]);
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handleKeydown = (e: KeyboardEvent) => {
+      // Don't trigger in inputs/textareas/selects
+      const tag = (e.target as HTMLElement).tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
+
+      if (e.key === "s" || e.key === "S") {
+        e.preventDefault();
+        if (activeEntry) {
+          handleStop();
+        } else if (taskName.trim()) {
+          handleStart();
+        } else {
+          taskInputRef.current?.focus();
+        }
+      }
+
+      if (e.key === "e" || e.key === "E") {
+        e.preventDefault();
+        if (completedEntries.length > 0) {
+          handleEdit(completedEntries[0]);
+        }
+      }
+
+      if (e.key === "m" || e.key === "M") {
+        e.preventDefault();
+        setShowManualEntry(true);
+      }
+    };
+
+    document.addEventListener("keydown", handleKeydown);
+    return () => document.removeEventListener("keydown", handleKeydown);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeEntry, taskName, completedEntries]);
+
   const handleStart = async () => {
     const name = taskName.trim();
     if (!name) return;
+
+    // Save last used project
+    if (selectedProjectId) {
+      localStorage.setItem("lastProjectId", selectedProjectId);
+    }
+
     const entry = await createEntry(name, selectedProjectId);
     if (entry) {
       if (selectedTagIds.length > 0) {
@@ -94,8 +158,8 @@ export default function TimeTracker() {
     const success = await stopEntry(activeEntry);
     if (success) {
       setTaskName("");
-      setSelectedProjectId(null);
       setSelectedTagIds([]);
+      // Keep the project selected for next entry (auto-select)
       await fetchEntries({ from: dateFrom, to: dateTo });
     }
   };
@@ -103,6 +167,11 @@ export default function TimeTracker() {
   const handleDelete = async (id: string) => {
     const success = await deleteEntry(id);
     if (success) await fetchEntries({ from: dateFrom, to: dateTo });
+  };
+
+  const handleDuplicate = async (entry: import("@/lib/types").TimeEntry) => {
+    const dup = await duplicateEntry(entry);
+    if (dup) await fetchEntries({ from: dateFrom, to: dateTo });
   };
 
   const handleEdit = useCallback(
@@ -127,6 +196,17 @@ export default function TimeTracker() {
     return success;
   };
 
+  const handleManualEntry = async (data: {
+    task_name: string;
+    started_at: string;
+    ended_at: string;
+    project_id?: string | null;
+  }) => {
+    const entry = await createManualEntry(data);
+    if (entry) await fetchEntries({ from: dateFrom, to: dateTo });
+    return entry;
+  };
+
   const handleDateFilter = (from: string | undefined, to: string | undefined) => {
     setDateFrom(from);
     setDateTo(to);
@@ -140,6 +220,7 @@ export default function TimeTracker() {
     { key: "projects", label: "Projects" },
     { key: "daily", label: "Daily" },
     { key: "weekly", label: "Weekly" },
+    { key: "monthly", label: "Monthly" },
     { key: "dashboard", label: "Dashboard" },
   ];
 
@@ -183,13 +264,13 @@ export default function TimeTracker() {
         </div>
 
         <div className="space-y-4">
-          {/* Task name + start/stop */}
           <div>
             <label className="block text-[10px] font-medium text-[var(--muted)] uppercase tracking-wider mb-1">
               Task
             </label>
             <div className="flex gap-2.5">
               <input
+                ref={taskInputRef}
                 type="text"
                 placeholder="What are you working on?"
                 value={taskName}
@@ -219,7 +300,6 @@ export default function TimeTracker() {
             </div>
           </div>
 
-          {/* Project / Client selector - prominent */}
           <ProjectSelector
             projects={projects}
             selectedId={selectedProjectId}
@@ -234,7 +314,6 @@ export default function TimeTracker() {
             }}
           />
 
-          {/* Tags */}
           {tags.length > 0 && (
             <div>
               <label className="block text-[10px] font-medium text-[var(--muted)] uppercase tracking-wider mb-1">
@@ -248,6 +327,19 @@ export default function TimeTracker() {
               />
             </div>
           )}
+        </div>
+
+        {/* Keyboard hints */}
+        <div className="flex items-center justify-center gap-4 mt-5 pt-4 border-t border-[var(--card-border)]">
+          <span className="text-[10px] text-[var(--muted)]">
+            <kbd className="px-1.5 py-0.5 rounded bg-[var(--card-border)] font-mono text-[9px]">S</kbd> Start/Stop
+          </span>
+          <span className="text-[10px] text-[var(--muted)]">
+            <kbd className="px-1.5 py-0.5 rounded bg-[var(--card-border)] font-mono text-[9px]">E</kbd> Edit last
+          </span>
+          <span className="text-[10px] text-[var(--muted)]">
+            <kbd className="px-1.5 py-0.5 rounded bg-[var(--card-border)] font-mono text-[9px]">M</kbd> Manual entry
+          </span>
         </div>
       </div>
 
@@ -272,6 +364,14 @@ export default function TimeTracker() {
         </div>
 
         <div className="flex items-center gap-1.5">
+          <button
+            onClick={() => setShowManualEntry(true)}
+            className="btn-premium inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg glass-card text-[var(--muted)] hover:text-[var(--foreground)] text-xs font-medium cursor-pointer"
+            title="Add manual entry"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
+            Add
+          </button>
           <ExportCSV entries={completedEntries} />
           <button
             onClick={() => setShowInvoice(true)}
@@ -303,13 +403,14 @@ export default function TimeTracker() {
 
       {/* Content */}
       {viewMode === "list" && (
-        <EntryList entries={completedEntries} onEdit={handleEdit} onDelete={handleDelete} />
+        <EntryList entries={completedEntries} onEdit={handleEdit} onDelete={handleDelete} onDuplicate={handleDuplicate} />
       )}
       {viewMode === "projects" && (
         <ProjectFolders entries={completedEntries} projects={projects} onEdit={handleEdit} onDelete={handleDelete} />
       )}
       {viewMode === "daily" && <DailySummary entries={completedEntries} />}
       {viewMode === "weekly" && <WeeklySummary entries={completedEntries} />}
+      {viewMode === "monthly" && <MonthlyReport entries={completedEntries} projects={projects} />}
       {viewMode === "dashboard" && <Dashboard entries={completedEntries} />}
 
       {/* Modals */}
@@ -342,6 +443,12 @@ export default function TimeTracker() {
         open={showInvoice}
         onClose={() => setShowInvoice(false)}
         entries={completedEntries}
+        projects={projects}
+      />
+      <ManualEntryModal
+        open={showManualEntry}
+        onClose={() => setShowManualEntry(false)}
+        onSave={handleManualEntry}
         projects={projects}
       />
     </div>
