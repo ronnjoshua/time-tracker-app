@@ -3,16 +3,34 @@ import DarkModeToggle from "@/components/DarkModeToggle";
 
 export default function Home() {
   return (
-    <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950">
-      <header className="border-b border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900">
-        <div className="max-w-2xl mx-auto px-6 py-5 flex items-center justify-between">
-          <div>
-            <h1 className="text-xl font-bold text-zinc-900 dark:text-zinc-100">
-              Time Tracker
-            </h1>
-            <p className="text-sm text-zinc-500 dark:text-zinc-400 mt-0.5">
-              Track your work hours for client billing
-            </p>
+    <div className="min-h-screen gradient-mesh">
+      <header className="sticky top-0 z-40 border-b border-[var(--card-border)] bg-[var(--glass)] backdrop-blur-xl">
+        <div className="max-w-2xl mx-auto px-6 py-4 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-lg bg-[var(--accent)] flex items-center justify-center">
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="white"
+                strokeWidth="2.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <circle cx="12" cy="12" r="10" />
+                <polyline points="12 6 12 12 16 14" />
+              </svg>
+            </div>
+            <div>
+              <h1 className="text-base font-semibold tracking-tight text-[var(--foreground)]">
+                Time Tracker
+              </h1>
+              <p className="text-xs text-[var(--muted)] leading-none mt-0.5">
+                Track &middot; Bill &middot; Invoice
+              </p>
+            </div>
           </div>
           <DarkModeToggle />
         </div>

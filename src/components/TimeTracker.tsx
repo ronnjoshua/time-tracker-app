@@ -49,12 +49,9 @@ export default function TimeTracker() {
   const elapsed = useTimer(activeEntry);
 
   const [taskName, setTaskName] = useState("");
-  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(
-    null
-  );
+  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
   const [selectedTagIds, setSelectedTagIds] = useState<string[]>([]);
 
-  // UI state
   const [viewMode, setViewMode] = useState<ViewMode>("list");
   const [showProjectManager, setShowProjectManager] = useState(false);
   const [showTagManager, setShowTagManager] = useState(false);
@@ -64,18 +61,15 @@ export default function TimeTracker() {
     tagIds: string[];
   } | null>(null);
 
-  // Date filter
   const [dateFrom, setDateFrom] = useState<string | undefined>();
   const [dateTo, setDateTo] = useState<string | undefined>();
 
-  // Initial load
   useEffect(() => {
     fetchEntries();
     fetchProjects();
     fetchTags();
   }, [fetchEntries, fetchProjects, fetchTags]);
 
-  // Sync active entry state
   useEffect(() => {
     if (activeEntry) {
       setTaskName(activeEntry.task_name);
@@ -86,10 +80,8 @@ export default function TimeTracker() {
   const handleStart = async () => {
     const name = taskName.trim();
     if (!name) return;
-
     const entry = await createEntry(name, selectedProjectId);
     if (entry) {
-      // Set tags for the new entry
       if (selectedTagIds.length > 0) {
         await setEntryTags(entry.id, selectedTagIds);
       }
@@ -110,18 +102,13 @@ export default function TimeTracker() {
 
   const handleDelete = async (id: string) => {
     const success = await deleteEntry(id);
-    if (success) {
-      await fetchEntries({ from: dateFrom, to: dateTo });
-    }
+    if (success) await fetchEntries({ from: dateFrom, to: dateTo });
   };
 
   const handleEdit = useCallback(
     async (entry: import("@/lib/types").TimeEntry) => {
       const entryTags = await getEntryTags(entry.id);
-      setEditingEntry({
-        entry,
-        tagIds: entryTags.map((t) => t.id),
-      });
+      setEditingEntry({ entry, tagIds: entryTags.map((t) => t.id) });
     },
     [getEntryTags]
   );
@@ -136,9 +123,7 @@ export default function TimeTracker() {
     }
   ) => {
     const success = await updateEntry(id, updates);
-    if (success) {
-      await fetchEntries({ from: dateFrom, to: dateTo });
-    }
+    if (success) await fetchEntries({ from: dateFrom, to: dateTo });
     return success;
   };
 
@@ -160,24 +145,45 @@ export default function TimeTracker() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-20">
-        <div className="text-zinc-400">Loading...</div>
+      <div className="flex items-center justify-center py-20 animate-fade-in">
+        <div className="flex items-center gap-2 text-[var(--muted)]">
+          <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+          </svg>
+          Loading...
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="w-full max-w-2xl mx-auto space-y-6">
+    <div className="w-full max-w-2xl mx-auto space-y-6 stagger-children">
       {/* Timer Section */}
-      <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 p-8 shadow-sm">
+      <div className="glass-card rounded-2xl p-8 animate-fade-in-scale">
         <div className="text-center mb-6">
-          <div className="text-5xl font-mono font-bold tracking-wider text-zinc-900 dark:text-zinc-100">
+          <div
+            className={`timer-display text-5xl font-mono font-bold text-[var(--foreground)] ${
+              isRunning ? "animate-pulse-glow rounded-xl inline-block px-4 py-2" : ""
+            }`}
+          >
             {formatDuration(elapsed)}
           </div>
+          {isRunning && (
+            <div className="flex items-center justify-center gap-1.5 mt-3">
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[var(--danger)] opacity-75" />
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-[var(--danger)]" />
+              </span>
+              <span className="text-xs font-medium text-[var(--danger)] tracking-wide uppercase">
+                Recording
+              </span>
+            </div>
+          )}
         </div>
 
         <div className="space-y-3">
-          <div className="flex gap-3">
+          <div className="flex gap-2.5">
             <input
               type="text"
               placeholder="What are you working on?"
@@ -187,7 +193,7 @@ export default function TimeTracker() {
                 if (e.key === "Enter" && !isRunning) handleStart();
               }}
               disabled={isRunning}
-              className="flex-1 px-4 py-3 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:opacity-50 transition"
+              className="input-premium flex-1 px-4 py-3 rounded-xl text-[var(--foreground)] placeholder-[var(--muted)] disabled:opacity-40 text-sm"
             />
             <ProjectSelector
               projects={projects}
@@ -198,7 +204,7 @@ export default function TimeTracker() {
             {isRunning ? (
               <button
                 onClick={handleStop}
-                className="px-8 py-3 rounded-xl bg-red-500 hover:bg-red-600 text-white font-semibold transition cursor-pointer"
+                className="btn-premium px-6 py-3 rounded-xl bg-[var(--danger)] hover:bg-red-600 text-white font-semibold text-sm cursor-pointer shadow-sm"
               >
                 Stop
               </button>
@@ -206,14 +212,13 @@ export default function TimeTracker() {
               <button
                 onClick={handleStart}
                 disabled={!taskName.trim()}
-                className="px-8 py-3 rounded-xl bg-emerald-500 hover:bg-emerald-600 disabled:bg-zinc-300 dark:disabled:bg-zinc-700 text-white font-semibold transition disabled:cursor-not-allowed cursor-pointer"
+                className="btn-premium px-6 py-3 rounded-xl bg-[var(--accent)] hover:bg-blue-600 disabled:bg-[var(--card-border)] disabled:text-[var(--muted)] text-white font-semibold text-sm disabled:cursor-not-allowed cursor-pointer shadow-sm"
               >
                 Start
               </button>
             )}
           </div>
 
-          {/* Tags row */}
           {tags.length > 0 && (
             <TagSelector
               tags={tags}
@@ -227,17 +232,16 @@ export default function TimeTracker() {
 
       {/* Toolbar */}
       <div className="flex items-center justify-between flex-wrap gap-3">
-        <div className="flex items-center gap-2">
-          {/* View mode toggle */}
-          <div className="flex rounded-lg overflow-hidden border border-zinc-200 dark:border-zinc-700">
+        <div className="flex items-center">
+          <div className="flex glass-card rounded-xl overflow-hidden p-0.5">
             {viewModes.map(({ key, label }) => (
               <button
                 key={key}
                 onClick={() => setViewMode(key)}
-                className={`px-3 py-1.5 text-sm font-medium transition cursor-pointer ${
+                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer ${
                   viewMode === key
-                    ? "bg-blue-500 text-white"
-                    : "bg-white dark:bg-zinc-900 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-800"
+                    ? "bg-[var(--accent)] text-white shadow-sm"
+                    : "text-[var(--muted)] hover:text-[var(--foreground)]"
                 }`}
               >
                 {label}
@@ -246,24 +250,24 @@ export default function TimeTracker() {
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5">
           <ExportCSV entries={completedEntries} />
           <button
             onClick={() => setShowInvoice(true)}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-sm font-medium transition cursor-pointer"
+            className="btn-premium inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg glass-card text-[var(--muted)] hover:text-[var(--foreground)] text-xs font-medium cursor-pointer"
           >
-            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+            <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
             Invoice
           </button>
           <button
             onClick={() => setShowProjectManager(true)}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-sm font-medium transition cursor-pointer"
+            className="btn-premium px-3 py-1.5 rounded-lg glass-card text-[var(--muted)] hover:text-[var(--foreground)] text-xs font-medium cursor-pointer"
           >
             Projects
           </button>
           <button
             onClick={() => setShowTagManager(true)}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-sm font-medium transition cursor-pointer"
+            className="btn-premium px-3 py-1.5 rounded-lg glass-card text-[var(--muted)] hover:text-[var(--foreground)] text-xs font-medium cursor-pointer"
           >
             Tags
           </button>
@@ -276,21 +280,12 @@ export default function TimeTracker() {
       {/* Summary */}
       <SummaryBar entries={completedEntries} />
 
-      {/* Content based on view mode */}
+      {/* Content */}
       {viewMode === "list" && (
-        <EntryList
-          entries={completedEntries}
-          onEdit={handleEdit}
-          onDelete={handleDelete}
-        />
+        <EntryList entries={completedEntries} onEdit={handleEdit} onDelete={handleDelete} />
       )}
       {viewMode === "projects" && (
-        <ProjectFolders
-          entries={completedEntries}
-          projects={projects}
-          onEdit={handleEdit}
-          onDelete={handleDelete}
-        />
+        <ProjectFolders entries={completedEntries} projects={projects} onEdit={handleEdit} onDelete={handleDelete} />
       )}
       {viewMode === "daily" && <DailySummary entries={completedEntries} />}
       {viewMode === "weekly" && <WeeklySummary entries={completedEntries} />}
@@ -305,7 +300,6 @@ export default function TimeTracker() {
         onUpdateProject={updateProject}
         onDeleteProject={deleteProject}
       />
-
       <TagManager
         open={showTagManager}
         onClose={() => setShowTagManager(false)}
@@ -313,7 +307,6 @@ export default function TimeTracker() {
         onCreateTag={createTag}
         onDeleteTag={deleteTag}
       />
-
       <EntryEditModal
         entry={editingEntry?.entry || null}
         open={!!editingEntry}
@@ -324,7 +317,6 @@ export default function TimeTracker() {
         entryTagIds={editingEntry?.tagIds || []}
         onSaveTags={setEntryTags}
       />
-
       <InvoiceGenerator
         open={showInvoice}
         onClose={() => setShowInvoice(false)}

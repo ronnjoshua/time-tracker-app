@@ -9,7 +9,6 @@ type DailySummaryProps = {
 };
 
 export default function DailySummary({ entries }: DailySummaryProps) {
-  // Group entries by day
   const grouped = entries.reduce<Record<string, TimeEntry[]>>((acc, entry) => {
     const day = format(startOfDay(new Date(entry.started_at)), "yyyy-MM-dd");
     if (!acc[day]) acc[day] = [];
@@ -21,15 +20,15 @@ export default function DailySummary({ entries }: DailySummaryProps) {
 
   if (days.length === 0) {
     return (
-      <div className="text-center py-8 text-zinc-400">
+      <div className="text-center py-8 text-[var(--muted)] text-sm">
         No entries for the selected period
       </div>
     );
   }
 
   return (
-    <div className="space-y-4">
-      <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
+    <div className="space-y-3 stagger-children">
+      <h2 className="text-sm font-semibold text-[var(--foreground)] uppercase tracking-wider">
         Daily Summary
       </h2>
       {days.map((day) => {
@@ -46,48 +45,45 @@ export default function DailySummary({ entries }: DailySummaryProps) {
         }, 0);
 
         return (
-          <div
-            key={day}
-            className="bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800 p-4"
-          >
+          <div key={day} className="glass-card rounded-xl p-4">
             <div className="flex justify-between items-center mb-3">
-              <div className="font-medium text-zinc-900 dark:text-zinc-100">
-                {format(new Date(day), "EEEE, MMM d, yyyy")}
+              <div className="text-sm font-medium text-[var(--foreground)]">
+                {format(new Date(day), "EEEE, MMM d")}
               </div>
-              <div className="flex items-center gap-3 text-sm">
-                <span className="font-mono font-semibold text-zinc-700 dark:text-zinc-300">
+              <div className="flex items-center gap-3 text-xs">
+                <span className="font-mono font-semibold text-[var(--foreground)] timer-display">
                   {formatDuration(totalSeconds)}
                 </span>
-                <span className="text-zinc-400">
-                  ({formatHours(totalSeconds)} hrs)
+                <span className="text-[var(--muted)]">
+                  {formatHours(totalSeconds)} hrs
                 </span>
                 {totalBillable > 0 && (
-                  <span className="text-emerald-500 font-medium">
+                  <span className="text-[var(--success)] font-medium">
                     ${totalBillable.toFixed(2)}
                   </span>
                 )}
               </div>
             </div>
-            <div className="space-y-1.5">
+            <div className="space-y-1">
               {dayEntries.map((entry) => (
                 <div
                   key={entry.id}
-                  className="flex items-center justify-between text-sm py-1"
+                  className="flex items-center justify-between text-xs py-1.5 border-t border-[var(--card-border)] first:border-0"
                 >
                   <div className="flex items-center gap-2">
-                    <span className="text-zinc-700 dark:text-zinc-300">
+                    <span className="text-[var(--foreground)]">
                       {entry.task_name}
                     </span>
                     {entry.project && (
                       <span
-                        className="px-1.5 py-0.5 rounded text-xs text-white"
+                        className="px-1.5 py-0.5 rounded text-[9px] text-white font-semibold uppercase"
                         style={{ backgroundColor: entry.project.color }}
                       >
                         {entry.project.name}
                       </span>
                     )}
                   </div>
-                  <span className="font-mono text-zinc-500">
+                  <span className="font-mono text-[var(--muted)] timer-display">
                     {formatDuration(entry.duration_seconds || 0)}
                   </span>
                 </div>

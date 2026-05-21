@@ -13,7 +13,6 @@ export default function SummaryBar({ entries }: SummaryBarProps) {
     0
   );
 
-  // Calculate billable amount from entries that have projects with hourly rates
   const totalBillable = entries.reduce((sum, e) => {
     if (e.project?.hourly_rate && e.duration_seconds) {
       return sum + (e.duration_seconds / 3600) * e.project.hourly_rate;
@@ -24,30 +23,30 @@ export default function SummaryBar({ entries }: SummaryBarProps) {
   if (entries.length === 0) return null;
 
   return (
-    <div className="bg-blue-50 dark:bg-blue-950/30 rounded-2xl border border-blue-100 dark:border-blue-900 p-6">
+    <div className="glass-card rounded-2xl p-5 bg-[var(--accent-soft)] border-[color:var(--accent)]!important border-opacity-20">
       <div className="flex justify-between items-center">
         <div>
-          <div className="text-sm font-medium text-blue-600 dark:text-blue-400">
-            Total Time Tracked
+          <div className="text-xs font-medium text-[var(--accent)] uppercase tracking-wider">
+            Total Tracked
           </div>
-          <div className="text-2xl font-bold text-blue-900 dark:text-blue-100">
+          <div className="text-xl font-bold text-[var(--foreground)] mt-0.5 timer-display">
             {formatDuration(totalSeconds)}
           </div>
         </div>
         <div className="text-center">
-          <div className="text-sm font-medium text-blue-600 dark:text-blue-400">
+          <div className="text-xs font-medium text-[var(--accent)] uppercase tracking-wider">
             Hours
           </div>
-          <div className="text-2xl font-bold text-blue-900 dark:text-blue-100">
-            {formatHours(totalSeconds)} hrs
+          <div className="text-xl font-bold text-[var(--foreground)] mt-0.5">
+            {formatHours(totalSeconds)}
           </div>
         </div>
         {totalBillable > 0 && (
           <div className="text-right">
-            <div className="text-sm font-medium text-blue-600 dark:text-blue-400">
-              Billable Amount
+            <div className="text-xs font-medium text-[var(--success)] uppercase tracking-wider">
+              Billable
             </div>
-            <div className="text-2xl font-bold text-emerald-700 dark:text-emerald-400">
+            <div className="text-xl font-bold text-[var(--success)] mt-0.5">
               ${totalBillable.toFixed(2)}
             </div>
           </div>

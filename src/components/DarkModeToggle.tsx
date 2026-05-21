@@ -8,14 +8,14 @@ export default function DarkModeToggle() {
   return (
     <button
       onClick={toggle}
-      className="p-2 rounded-lg text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition cursor-pointer"
+      className="btn-premium p-2 rounded-xl glass-card text-[var(--muted)] hover:text-[var(--foreground)] cursor-pointer"
       title="Toggle dark mode"
     >
       {/* Sun icon (shown in dark mode) */}
       <svg
         xmlns="http://www.w3.org/2000/svg"
-        width="18"
-        height="18"
+        width="16"
+        height="16"
         viewBox="0 0 24 24"
         fill="none"
         stroke="currentColor"
@@ -37,8 +37,8 @@ export default function DarkModeToggle() {
       {/* Moon icon (shown in light mode) */}
       <svg
         xmlns="http://www.w3.org/2000/svg"
-        width="18"
-        height="18"
+        width="16"
+        height="16"
         viewBox="0 0 24 24"
         fill="none"
         stroke="currentColor"

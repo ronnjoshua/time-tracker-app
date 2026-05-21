@@ -9,7 +9,6 @@ import {
   startOfMonth,
   endOfMonth,
   subMonths,
-  format,
 } from "date-fns";
 
 type DateRangeFilterProps = {
@@ -75,16 +74,16 @@ export default function DateRangeFilter({ onFilter }: DateRangeFilterProps) {
   ];
 
   return (
-    <div className="space-y-3">
-      <div className="flex flex-wrap gap-2">
+    <div className="space-y-2.5">
+      <div className="flex flex-wrap gap-1.5">
         {presets.map(({ key, label }) => (
           <button
             key={key}
             onClick={() => applyPreset(key)}
-            className={`px-3 py-1.5 rounded-lg text-sm font-medium transition cursor-pointer ${
+            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer ${
               preset === key
-                ? "bg-blue-500 text-white"
-                : "bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-700"
+                ? "bg-[var(--accent)] text-white shadow-sm"
+                : "glass-card text-[var(--muted)] hover:text-[var(--foreground)]"
             }`}
           >
             {label}
@@ -93,24 +92,24 @@ export default function DateRangeFilter({ onFilter }: DateRangeFilterProps) {
       </div>
 
       {preset === "custom" && (
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 animate-fade-in">
           <input
             type="date"
             value={customFrom}
             onChange={(e) => setCustomFrom(e.target.value)}
-            className="px-3 py-1.5 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="input-premium px-3 py-1.5 rounded-lg text-xs text-[var(--foreground)]"
           />
-          <span className="text-zinc-400 text-sm">to</span>
+          <span className="text-[var(--muted)] text-xs">to</span>
           <input
             type="date"
             value={customTo}
             onChange={(e) => setCustomTo(e.target.value)}
-            className="px-3 py-1.5 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="input-premium px-3 py-1.5 rounded-lg text-xs text-[var(--foreground)]"
           />
           <button
             onClick={applyCustom}
             disabled={!customFrom || !customTo}
-            className="px-3 py-1.5 rounded-lg bg-blue-500 hover:bg-blue-600 disabled:bg-zinc-300 text-white text-sm font-medium transition cursor-pointer disabled:cursor-not-allowed"
+            className="btn-premium px-3 py-1.5 rounded-lg bg-[var(--accent)] text-white text-xs font-medium cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
           >
             Apply
           </button>

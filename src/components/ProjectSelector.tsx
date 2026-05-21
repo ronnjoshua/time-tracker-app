@@ -20,7 +20,7 @@ export default function ProjectSelector({
       value={selectedId || ""}
       onChange={(e) => onChange(e.target.value || null)}
       disabled={disabled}
-      className="px-3 py-3 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:opacity-50 transition text-sm cursor-pointer"
+      className="input-premium px-3 py-3 rounded-xl text-[var(--foreground)] disabled:opacity-40 text-xs cursor-pointer"
     >
       <option value="">No project</option>
       {projects.map((p) => (
