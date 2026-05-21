@@ -182,50 +182,71 @@ export default function TimeTracker() {
           )}
         </div>
 
-        <div className="space-y-3">
-          <div className="flex gap-2.5">
-            <input
-              type="text"
-              placeholder="What are you working on?"
-              value={taskName}
-              onChange={(e) => setTaskName(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && !isRunning) handleStart();
-              }}
-              disabled={isRunning}
-              className="input-premium flex-1 px-4 py-3 rounded-xl text-[var(--foreground)] placeholder-[var(--muted)] disabled:opacity-40 text-sm"
-            />
-            <ProjectSelector
-              projects={projects}
-              selectedId={selectedProjectId}
-              onChange={setSelectedProjectId}
-              disabled={isRunning}
-            />
-            {isRunning ? (
-              <button
-                onClick={handleStop}
-                className="btn-premium px-6 py-3 rounded-xl bg-[var(--danger)] hover:bg-red-600 text-white font-semibold text-sm cursor-pointer shadow-sm"
-              >
-                Stop
-              </button>
-            ) : (
-              <button
-                onClick={handleStart}
-                disabled={!taskName.trim()}
-                className="btn-premium px-6 py-3 rounded-xl bg-[var(--accent)] hover:bg-blue-600 disabled:bg-[var(--card-border)] disabled:text-[var(--muted)] text-white font-semibold text-sm disabled:cursor-not-allowed cursor-pointer shadow-sm"
-              >
-                Start
-              </button>
-            )}
+        <div className="space-y-4">
+          {/* Task name + start/stop */}
+          <div>
+            <label className="block text-[10px] font-medium text-[var(--muted)] uppercase tracking-wider mb-1">
+              Task
+            </label>
+            <div className="flex gap-2.5">
+              <input
+                type="text"
+                placeholder="What are you working on?"
+                value={taskName}
+                onChange={(e) => setTaskName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !isRunning) handleStart();
+                }}
+                disabled={isRunning}
+                className="input-premium flex-1 px-4 py-2.5 rounded-xl text-[var(--foreground)] placeholder-[var(--muted)] disabled:opacity-40 text-sm"
+              />
+              {isRunning ? (
+                <button
+                  onClick={handleStop}
+                  className="btn-premium px-6 py-2.5 rounded-xl bg-[var(--danger)] hover:bg-red-600 text-white font-semibold text-sm cursor-pointer shadow-sm"
+                >
+                  Stop
+                </button>
+              ) : (
+                <button
+                  onClick={handleStart}
+                  disabled={!taskName.trim()}
+                  className="btn-premium px-6 py-2.5 rounded-xl bg-[var(--accent)] hover:bg-blue-600 disabled:bg-[var(--card-border)] disabled:text-[var(--muted)] text-white font-semibold text-sm disabled:cursor-not-allowed cursor-pointer shadow-sm"
+                >
+                  Start
+                </button>
+              )}
+            </div>
           </div>
 
+          {/* Project / Client selector - prominent */}
+          <ProjectSelector
+            projects={projects}
+            selectedId={selectedProjectId}
+            onChange={setSelectedProjectId}
+            disabled={isRunning}
+            onQuickCreate={async (name, clientName) => {
+              const project = await createProject({
+                name,
+                client_name: clientName || undefined,
+              });
+              return project;
+            }}
+          />
+
+          {/* Tags */}
           {tags.length > 0 && (
-            <TagSelector
-              tags={tags}
-              selectedIds={selectedTagIds}
-              onChange={setSelectedTagIds}
-              disabled={isRunning}
-            />
+            <div>
+              <label className="block text-[10px] font-medium text-[var(--muted)] uppercase tracking-wider mb-1">
+                Tags
+              </label>
+              <TagSelector
+                tags={tags}
+                selectedIds={selectedTagIds}
+                onChange={setSelectedTagIds}
+                disabled={isRunning}
+              />
+            </div>
           )}
         </div>
       </div>
