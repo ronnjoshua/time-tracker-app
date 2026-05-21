@@ -1,15 +1,11 @@
-const CACHE_NAME = "time-tracker-v1";
-const PRECACHE_URLS = ["/", "/manifest.json"];
+const CACHE_NAME = "time-tracker-v2";
 
-// Install: precache shell
+// Install: skip waiting to activate immediately
 self.addEventListener("install", (event) => {
-  event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => cache.addAll(PRECACHE_URLS))
-  );
   self.skipWaiting();
 });
 
-// Activate: clean old caches
+// Activate: clean old caches and claim clients
 self.addEventListener("activate", (event) => {
   event.waitUntil(
     caches.keys().then((keys) =>
@@ -23,7 +19,7 @@ self.addEventListener("activate", (event) => {
   self.clients.claim();
 });
 
-// Fetch: network-first for API, cache-first for static assets
+// Fetch: network-first for everything except hashed static assets
 self.addEventListener("fetch", (event) => {
   const { request } = event;
   const url = new URL(request.url);
@@ -31,10 +27,10 @@ self.addEventListener("fetch", (event) => {
   // Skip non-GET requests
   if (request.method !== "GET") return;
 
-  // Skip Supabase API calls - always go to network
-  if (url.hostname.includes("supabase")) return;
+  // Skip Supabase API calls and external requests
+  if (url.origin !== self.location.origin) return;
 
-  // For navigation requests (HTML pages): network-first
+  // For navigation requests: network-first, cache fallback
   if (request.mode === "navigate") {
     event.respondWith(
       fetch(request)
@@ -48,15 +44,8 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  // For static assets: cache-first
-  if (
-    url.pathname.startsWith("/_next/static/") ||
-    url.pathname.startsWith("/icons/") ||
-    url.pathname.endsWith(".js") ||
-    url.pathname.endsWith(".css") ||
-    url.pathname.endsWith(".png") ||
-    url.pathname.endsWith(".svg")
-  ) {
+  // For Next.js hashed static assets: cache-first (filenames include hash)
+  if (url.pathname.startsWith("/_next/static/")) {
     event.respondWith(
       caches.match(request).then((cached) => {
         if (cached) return cached;
@@ -69,4 +58,21 @@ self.addEventListener("fetch", (event) => {
     );
     return;
   }
+
+  // For icons and images: cache-first
+  if (url.pathname.startsWith("/icons/") || url.pathname.endsWith(".png") || url.pathname.endsWith(".svg")) {
+    event.respondWith(
+      caches.match(request).then((cached) => {
+        if (cached) return cached;
+        return fetch(request).then((response) => {
+          const clone = response.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(request, clone));
+          return response;
+        });
+      })
+    );
+    return;
+  }
+
+  // Everything else: network-first
 });
