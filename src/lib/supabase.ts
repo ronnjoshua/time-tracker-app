@@ -5,11 +5,5 @@ const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
-export type TimeEntry = {
-  id: string;
-  task_name: string;
-  started_at: string;
-  ended_at: string | null;
-  duration_seconds: number | null;
-  created_at: string;
-};
+// Re-export types for convenience
+export type { TimeEntry, Project, Tag, Profile } from "./types";

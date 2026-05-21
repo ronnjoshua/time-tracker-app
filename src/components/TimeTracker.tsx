@@ -1,148 +1,160 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { supabase, type TimeEntry } from "@/lib/supabase";
+import { formatDuration } from "@/lib/format";
+import { useEntries } from "@/hooks/useEntries";
+import { useTimer } from "@/hooks/useTimer";
+import { useProjects } from "@/hooks/useProjects";
+import { useTags } from "@/hooks/useTags";
+import ProjectSelector from "./ProjectSelector";
+import ProjectManager from "./ProjectManager";
+import TagSelector from "./TagSelector";
+import TagManager from "./TagManager";
+import EntryList from "./EntryList";
+import EntryEditModal from "./EntryEditModal";
+import SummaryBar from "./SummaryBar";
+import DateRangeFilter from "./DateRangeFilter";
+import DailySummary from "./DailySummary";
+import WeeklySummary from "./WeeklySummary";
+import ExportCSV from "./ExportCSV";
+import Dashboard from "./Dashboard";
+import InvoiceGenerator from "./InvoiceGenerator";
 
-function formatDuration(totalSeconds: number): string {
-  const hours = Math.floor(totalSeconds / 3600);
-  const minutes = Math.floor((totalSeconds % 3600) / 60);
-  const seconds = totalSeconds % 60;
-  return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
-}
-
-function formatHours(totalSeconds: number): string {
-  const hours = totalSeconds / 3600;
-  return hours.toFixed(2);
-}
-
-function formatDate(dateStr: string): string {
-  return new Date(dateStr).toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  });
-}
-
-function formatTime(dateStr: string): string {
-  return new Date(dateStr).toLocaleTimeString("en-US", {
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
+type ViewMode = "list" | "daily" | "weekly" | "dashboard";
 
 export default function TimeTracker() {
+  const {
+    completedEntries,
+    activeEntry,
+    loading,
+    fetchEntries,
+    createEntry,
+    stopEntry,
+    updateEntry,
+    deleteEntry,
+  } = useEntries();
+
+  const {
+    projects,
+    fetchProjects,
+    createProject,
+    updateProject,
+    deleteProject,
+  } = useProjects();
+
+  const { tags, fetchTags, createTag, deleteTag, getEntryTags, setEntryTags } =
+    useTags();
+
+  const elapsed = useTimer(activeEntry);
+
   const [taskName, setTaskName] = useState("");
-  const [isRunning, setIsRunning] = useState(false);
-  const [activeEntry, setActiveEntry] = useState<TimeEntry | null>(null);
-  const [elapsed, setElapsed] = useState(0);
-  const [entries, setEntries] = useState<TimeEntry[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(
+    null
+  );
+  const [selectedTagIds, setSelectedTagIds] = useState<string[]>([]);
 
-  const fetchEntries = useCallback(async () => {
-    const { data, error } = await supabase
-      .from("time_entries")
-      .select("*")
-      .order("started_at", { ascending: false });
+  // UI state
+  const [viewMode, setViewMode] = useState<ViewMode>("list");
+  const [showProjectManager, setShowProjectManager] = useState(false);
+  const [showTagManager, setShowTagManager] = useState(false);
+  const [showInvoice, setShowInvoice] = useState(false);
+  const [editingEntry, setEditingEntry] = useState<{
+    entry: import("@/lib/types").TimeEntry;
+    tagIds: string[];
+  } | null>(null);
 
-    if (error) {
-      console.error("Error fetching entries:", error);
-      return;
-    }
+  // Date filter
+  const [dateFrom, setDateFrom] = useState<string | undefined>();
+  const [dateTo, setDateTo] = useState<string | undefined>();
 
-    setEntries(data || []);
-
-    // Check if there's an active (unstopped) entry
-    const active = data?.find((e: TimeEntry) => !e.ended_at);
-    if (active) {
-      setActiveEntry(active);
-      setTaskName(active.task_name);
-      setIsRunning(true);
-    }
-  }, []);
-
+  // Initial load
   useEffect(() => {
-    fetchEntries().finally(() => setLoading(false));
-  }, [fetchEntries]);
+    fetchEntries();
+    fetchProjects();
+    fetchTags();
+  }, [fetchEntries, fetchProjects, fetchTags]);
 
-  // Timer tick
+  // Sync active entry state
   useEffect(() => {
-    if (!isRunning || !activeEntry) return;
-
-    const tick = () => {
-      const start = new Date(activeEntry.started_at).getTime();
-      const now = Date.now();
-      setElapsed(Math.floor((now - start) / 1000));
-    };
-
-    tick();
-    const interval = setInterval(tick, 1000);
-    return () => clearInterval(interval);
-  }, [isRunning, activeEntry]);
+    if (activeEntry) {
+      setTaskName(activeEntry.task_name);
+      setSelectedProjectId(activeEntry.project_id || null);
+    }
+  }, [activeEntry]);
 
   const handleStart = async () => {
     const name = taskName.trim();
     if (!name) return;
 
-    const { data, error } = await supabase
-      .from("time_entries")
-      .insert({ task_name: name })
-      .select()
-      .single();
-
-    if (error) {
-      console.error("Error starting timer:", error);
-      return;
+    const entry = await createEntry(name, selectedProjectId);
+    if (entry) {
+      // Set tags for the new entry
+      if (selectedTagIds.length > 0) {
+        await setEntryTags(entry.id, selectedTagIds);
+      }
+      await fetchEntries({ from: dateFrom, to: dateTo });
     }
-
-    setActiveEntry(data);
-    setIsRunning(true);
-    setElapsed(0);
-    await fetchEntries();
   };
 
   const handleStop = async () => {
     if (!activeEntry) return;
-
-    const now = new Date().toISOString();
-    const start = new Date(activeEntry.started_at).getTime();
-    const durationSeconds = Math.floor((Date.now() - start) / 1000);
-
-    const { error } = await supabase
-      .from("time_entries")
-      .update({ ended_at: now, duration_seconds: durationSeconds })
-      .eq("id", activeEntry.id);
-
-    if (error) {
-      console.error("Error stopping timer:", error);
-      return;
+    const success = await stopEntry(activeEntry);
+    if (success) {
+      setTaskName("");
+      setSelectedProjectId(null);
+      setSelectedTagIds([]);
+      await fetchEntries({ from: dateFrom, to: dateTo });
     }
-
-    setIsRunning(false);
-    setActiveEntry(null);
-    setElapsed(0);
-    setTaskName("");
-    await fetchEntries();
   };
 
   const handleDelete = async (id: string) => {
-    const { error } = await supabase
-      .from("time_entries")
-      .delete()
-      .eq("id", id);
-
-    if (error) {
-      console.error("Error deleting entry:", error);
-      return;
+    const success = await deleteEntry(id);
+    if (success) {
+      await fetchEntries({ from: dateFrom, to: dateTo });
     }
-
-    await fetchEntries();
   };
 
-  const completedEntries = entries.filter((e) => e.ended_at);
-  const totalSeconds = completedEntries.reduce(
-    (sum, e) => sum + (e.duration_seconds || 0),
-    0
+  const handleEdit = useCallback(
+    async (entry: import("@/lib/types").TimeEntry) => {
+      const entryTags = await getEntryTags(entry.id);
+      setEditingEntry({
+        entry,
+        tagIds: entryTags.map((t) => t.id),
+      });
+    },
+    [getEntryTags]
   );
+
+  const handleSaveEdit = async (
+    id: string,
+    updates: {
+      task_name?: string;
+      started_at?: string;
+      ended_at?: string;
+      project_id?: string | null;
+    }
+  ) => {
+    const success = await updateEntry(id, updates);
+    if (success) {
+      await fetchEntries({ from: dateFrom, to: dateTo });
+    }
+    return success;
+  };
+
+  const handleDateFilter = (from: string | undefined, to: string | undefined) => {
+    setDateFrom(from);
+    setDateTo(to);
+    fetchEntries({ from, to });
+  };
+
+  const isRunning = !!activeEntry;
+
+  const viewModes: { key: ViewMode; label: string }[] = [
+    { key: "list", label: "List" },
+    { key: "daily", label: "Daily" },
+    { key: "weekly", label: "Weekly" },
+    { key: "dashboard", label: "Dashboard" },
+  ];
 
   if (loading) {
     return (
@@ -153,7 +165,7 @@ export default function TimeTracker() {
   }
 
   return (
-    <div className="w-full max-w-2xl mx-auto space-y-8">
+    <div className="w-full max-w-2xl mx-auto space-y-6">
       {/* Timer Section */}
       <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 p-8 shadow-sm">
         <div className="text-center mb-6">
@@ -162,128 +174,153 @@ export default function TimeTracker() {
           </div>
         </div>
 
-        <div className="flex gap-3">
-          <input
-            type="text"
-            placeholder="What are you working on?"
-            value={taskName}
-            onChange={(e) => setTaskName(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && !isRunning) handleStart();
-            }}
-            disabled={isRunning}
-            className="flex-1 px-4 py-3 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:opacity-50 transition"
-          />
-          {isRunning ? (
-            <button
-              onClick={handleStop}
-              className="px-8 py-3 rounded-xl bg-red-500 hover:bg-red-600 text-white font-semibold transition cursor-pointer"
-            >
-              Stop
-            </button>
-          ) : (
-            <button
-              onClick={handleStart}
-              disabled={!taskName.trim()}
-              className="px-8 py-3 rounded-xl bg-emerald-500 hover:bg-emerald-600 disabled:bg-zinc-300 dark:disabled:bg-zinc-700 text-white font-semibold transition disabled:cursor-not-allowed cursor-pointer"
-            >
-              Start
-            </button>
+        <div className="space-y-3">
+          <div className="flex gap-3">
+            <input
+              type="text"
+              placeholder="What are you working on?"
+              value={taskName}
+              onChange={(e) => setTaskName(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !isRunning) handleStart();
+              }}
+              disabled={isRunning}
+              className="flex-1 px-4 py-3 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:opacity-50 transition"
+            />
+            <ProjectSelector
+              projects={projects}
+              selectedId={selectedProjectId}
+              onChange={setSelectedProjectId}
+              disabled={isRunning}
+            />
+            {isRunning ? (
+              <button
+                onClick={handleStop}
+                className="px-8 py-3 rounded-xl bg-red-500 hover:bg-red-600 text-white font-semibold transition cursor-pointer"
+              >
+                Stop
+              </button>
+            ) : (
+              <button
+                onClick={handleStart}
+                disabled={!taskName.trim()}
+                className="px-8 py-3 rounded-xl bg-emerald-500 hover:bg-emerald-600 disabled:bg-zinc-300 dark:disabled:bg-zinc-700 text-white font-semibold transition disabled:cursor-not-allowed cursor-pointer"
+              >
+                Start
+              </button>
+            )}
+          </div>
+
+          {/* Tags row */}
+          {tags.length > 0 && (
+            <TagSelector
+              tags={tags}
+              selectedIds={selectedTagIds}
+              onChange={setSelectedTagIds}
+              disabled={isRunning}
+            />
           )}
         </div>
       </div>
 
-      {/* Summary */}
-      {completedEntries.length > 0 && (
-        <div className="bg-blue-50 dark:bg-blue-950/30 rounded-2xl border border-blue-100 dark:border-blue-900 p-6">
-          <div className="flex justify-between items-center">
-            <div>
-              <div className="text-sm font-medium text-blue-600 dark:text-blue-400">
-                Total Time Tracked
-              </div>
-              <div className="text-2xl font-bold text-blue-900 dark:text-blue-100">
-                {formatDuration(totalSeconds)}
-              </div>
-            </div>
-            <div className="text-right">
-              <div className="text-sm font-medium text-blue-600 dark:text-blue-400">
-                Billable Hours
-              </div>
-              <div className="text-2xl font-bold text-blue-900 dark:text-blue-100">
-                {formatHours(totalSeconds)} hrs
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Entries List */}
-      {completedEntries.length > 0 && (
-        <div className="space-y-3">
-          <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
-            Time Entries
-          </h2>
-          <div className="space-y-2">
-            {completedEntries.map((entry) => (
-              <div
-                key={entry.id}
-                className="group bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800 p-4 flex items-center justify-between transition hover:border-zinc-300 dark:hover:border-zinc-700"
+      {/* Toolbar */}
+      <div className="flex items-center justify-between flex-wrap gap-3">
+        <div className="flex items-center gap-2">
+          {/* View mode toggle */}
+          <div className="flex rounded-lg overflow-hidden border border-zinc-200 dark:border-zinc-700">
+            {viewModes.map(({ key, label }) => (
+              <button
+                key={key}
+                onClick={() => setViewMode(key)}
+                className={`px-3 py-1.5 text-sm font-medium transition cursor-pointer ${
+                  viewMode === key
+                    ? "bg-blue-500 text-white"
+                    : "bg-white dark:bg-zinc-900 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-800"
+                }`}
               >
-                <div className="flex-1 min-w-0">
-                  <div className="font-medium text-zinc-900 dark:text-zinc-100 truncate">
-                    {entry.task_name}
-                  </div>
-                  <div className="text-sm text-zinc-500 dark:text-zinc-400 mt-0.5">
-                    {formatDate(entry.started_at)} &middot;{" "}
-                    {formatTime(entry.started_at)} &ndash;{" "}
-                    {entry.ended_at ? formatTime(entry.ended_at) : "ongoing"}
-                  </div>
-                </div>
-                <div className="flex items-center gap-4 ml-4">
-                  <div className="text-right">
-                    <div className="font-mono font-semibold text-zinc-900 dark:text-zinc-100">
-                      {formatDuration(entry.duration_seconds || 0)}
-                    </div>
-                    <div className="text-xs text-zinc-400">
-                      {formatHours(entry.duration_seconds || 0)} hrs
-                    </div>
-                  </div>
-                  <button
-                    onClick={() => handleDelete(entry.id)}
-                    className="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg text-zinc-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950 transition cursor-pointer"
-                    title="Delete entry"
-                  >
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      width="16"
-                      height="16"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    >
-                      <path d="M3 6h18" />
-                      <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
-                      <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
-                    </svg>
-                  </button>
-                </div>
-              </div>
+                {label}
+              </button>
             ))}
           </div>
         </div>
-      )}
 
-      {completedEntries.length === 0 && !isRunning && (
-        <div className="text-center py-12 text-zinc-400">
-          <p className="text-lg">No time entries yet</p>
-          <p className="text-sm mt-1">
-            Enter a task name and hit Start to begin tracking
-          </p>
+        <div className="flex items-center gap-2">
+          <ExportCSV entries={completedEntries} />
+          <button
+            onClick={() => setShowInvoice(true)}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-sm font-medium transition cursor-pointer"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+            Invoice
+          </button>
+          <button
+            onClick={() => setShowProjectManager(true)}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-sm font-medium transition cursor-pointer"
+          >
+            Projects
+          </button>
+          <button
+            onClick={() => setShowTagManager(true)}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-sm font-medium transition cursor-pointer"
+          >
+            Tags
+          </button>
         </div>
+      </div>
+
+      {/* Date Filter */}
+      <DateRangeFilter onFilter={handleDateFilter} />
+
+      {/* Summary */}
+      <SummaryBar entries={completedEntries} />
+
+      {/* Content based on view mode */}
+      {viewMode === "list" && (
+        <EntryList
+          entries={completedEntries}
+          onEdit={handleEdit}
+          onDelete={handleDelete}
+        />
       )}
+      {viewMode === "daily" && <DailySummary entries={completedEntries} />}
+      {viewMode === "weekly" && <WeeklySummary entries={completedEntries} />}
+      {viewMode === "dashboard" && <Dashboard entries={completedEntries} />}
+
+      {/* Modals */}
+      <ProjectManager
+        open={showProjectManager}
+        onClose={() => setShowProjectManager(false)}
+        projects={projects}
+        onCreateProject={createProject}
+        onUpdateProject={updateProject}
+        onDeleteProject={deleteProject}
+      />
+
+      <TagManager
+        open={showTagManager}
+        onClose={() => setShowTagManager(false)}
+        tags={tags}
+        onCreateTag={createTag}
+        onDeleteTag={deleteTag}
+      />
+
+      <EntryEditModal
+        entry={editingEntry?.entry || null}
+        open={!!editingEntry}
+        onClose={() => setEditingEntry(null)}
+        onSave={handleSaveEdit}
+        projects={projects}
+        tags={tags}
+        entryTagIds={editingEntry?.tagIds || []}
+        onSaveTags={setEntryTags}
+      />
+
+      <InvoiceGenerator
+        open={showInvoice}
+        onClose={() => setShowInvoice(false)}
+        entries={completedEntries}
+        projects={projects}
+      />
     </div>
   );
 }
