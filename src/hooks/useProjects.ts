@@ -4,6 +4,11 @@ import { useState, useCallback } from "react";
 import { supabase } from "@/lib/supabase";
 import type { Project } from "@/lib/types";
 
+async function getUserId(): Promise<string | null> {
+  const { data: { user } } = await supabase.auth.getUser();
+  return user?.id || null;
+}
+
 export function useProjects() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
@@ -30,9 +35,10 @@ export function useProjects() {
     hourly_rate?: number;
     color?: string;
   }) => {
+    const userId = await getUserId();
     const { data, error } = await supabase
       .from("projects")
-      .insert(project)
+      .insert({ ...project, ...(userId ? { user_id: userId } : {}) })
       .select()
       .single();
 

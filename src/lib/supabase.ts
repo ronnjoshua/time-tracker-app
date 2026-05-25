@@ -1,9 +1,7 @@
-import { createClient } from "@supabase/supabase-js";
+import { createSupabaseBrowser } from "./supabase-browser";
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+// Browser client singleton for use in client components and hooks
+export const supabase = createSupabaseBrowser();
 
 // Re-export types for convenience
 export type { TimeEntry, Project, Tag, Profile } from "./types";

@@ -4,6 +4,11 @@ import { useState, useCallback } from "react";
 import { supabase } from "@/lib/supabase";
 import type { TimeEntry } from "@/lib/types";
 
+async function getUserId(): Promise<string | null> {
+  const { data: { user } } = await supabase.auth.getUser();
+  return user?.id || null;
+}
+
 export function useEntries() {
   const [entries, setEntries] = useState<TimeEntry[]>([]);
   const [loading, setLoading] = useState(true);
@@ -37,8 +42,10 @@ export function useEntries() {
   );
 
   const createEntry = async (taskName: string, projectId?: string | null) => {
+    const userId = await getUserId();
     const insertData: Record<string, unknown> = { task_name: taskName };
     if (projectId) insertData.project_id = projectId;
+    if (userId) insertData.user_id = userId;
 
     const { data, error } = await supabase
       .from("time_entries")
@@ -106,6 +113,7 @@ export function useEntries() {
     ended_at: string;
     project_id?: string | null;
   }) => {
+    const userId = await getUserId();
     const start = new Date(data.started_at).getTime();
     const end = new Date(data.ended_at).getTime();
     const durationSeconds = Math.floor((end - start) / 1000);
@@ -117,6 +125,7 @@ export function useEntries() {
       duration_seconds: durationSeconds,
     };
     if (data.project_id) insertData.project_id = data.project_id;
+    if (userId) insertData.user_id = userId;
 
     const { data: entry, error } = await supabase
       .from("time_entries")
@@ -133,6 +142,7 @@ export function useEntries() {
   };
 
   const duplicateEntry = async (entry: TimeEntry) => {
+    const userId = await getUserId();
     const now = new Date();
     const durationMs = (entry.duration_seconds || 0) * 1000;
     const startedAt = new Date(now.getTime() - durationMs).toISOString();
@@ -144,6 +154,7 @@ export function useEntries() {
       duration_seconds: entry.duration_seconds,
     };
     if (entry.project_id) insertData.project_id = entry.project_id;
+    if (userId) insertData.user_id = userId;
 
     const { data, error } = await supabase
       .from("time_entries")

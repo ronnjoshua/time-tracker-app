@@ -4,6 +4,11 @@ import { useState, useCallback } from "react";
 import { supabase } from "@/lib/supabase";
 import type { Tag } from "@/lib/types";
 
+async function getUserId(): Promise<string | null> {
+  const { data: { user } } = await supabase.auth.getUser();
+  return user?.id || null;
+}
+
 export function useTags() {
   const [tags, setTags] = useState<Tag[]>([]);
   const [loading, setLoading] = useState(true);
@@ -24,9 +29,10 @@ export function useTags() {
   }, []);
 
   const createTag = async (tag: { name: string; color?: string }) => {
+    const userId = await getUserId();
     const { data, error } = await supabase
       .from("tags")
-      .insert(tag)
+      .insert({ ...tag, ...(userId ? { user_id: userId } : {}) })
       .select()
       .single();
 
